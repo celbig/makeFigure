@@ -10,7 +10,7 @@
 #'
 #' @export
 #' @importFrom furrr furrr_options
-export_figure = function(
+make_figure = function(
   config_file,
   figure = NULL,
   theme = ggplot2::theme_get()

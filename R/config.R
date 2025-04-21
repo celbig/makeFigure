@@ -148,3 +148,67 @@ parse_figure_config_field = function(field_config, field_name, global) {
   "Unable to correctly parse configuration for figure {.name {field_name}}!")
   return(config)
 }
+
+
+
+parse_config_plot_field <- function(field_config, field_name, figure, global) {
+  try_or_error({
+    if (is.character(field_config)) {
+      if (length(field_config > 1)) {
+        abort("A plot cannot be defined by a list of strings!")
+      }
+      field_config = list(script = field_config)
+    }
+
+    if (is.list(field_config) && is.null(names(field_config))){
+      abort("The configuration must be provided as a dictionary object, not unamed list!")
+    }
+
+
+    script = pluck(field_config, "script", .default = paste0(field_name, ".R"))
+    script = file.path(global[["individual_plot_dir"]], script)
+    
+    data_figure = figure[["data"]]
+    data = pluck(field_config, "data", .default = list())
+    if(!is.list(data)) {
+      data = as.list(data)
+    }
+    data = list_assign(figure[["data"]], !!!data)
+
+    params = pluck(field_config, "params", .default = list())
+    if(!is.list(params)) {
+      params = as.list(params)
+    }
+    params = list_assign(figure[["params"]], !!!params)
+
+
+    library = pluck(field_config, "library", .default = character())
+    if(!is.character(library)) {
+      library = as.character(library)
+    }
+    default_libs = c("ggplot2", "patchwork", "glue")
+    library = unique(c(default_libs, library, figure[["library"]]))
+
+    used_keys = c("script", "data", "params", "library")
+    if (any(!names(field_config) %in% used_keys)) {
+      wrong_names  = names(field_config)[which(!names(field_config) %in% used_keys)]
+      msg = glue("{{.field {wrong_names}}} entry was ignored in configuration for figure {field_name}")
+      names(msg) = rep("i", length = length(msg))
+      cli::cli_warn(c(
+        "!" = "Only {.field {used_keys}} are valid configuration fields for a figure!",
+        msg
+      ))
+    }
+
+    config = list(
+      name = field_name, 
+      script = script, 
+      params = params, 
+      data = data, 
+      library = library
+    )
+  }, "Error while parsing plot config for plot {.field {field_name}}")
+  
+
+  return(config)
+}

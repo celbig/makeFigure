@@ -26,6 +26,7 @@
 #' @importFrom rlang env
 #' @importFrom rlang is_empty
 #' @importFrom purrr map 
+#' @importFrom purrr list_assign
 #' @importFrom callr r
 #' @importFrom rlang current_env
 #' @importFrom rlang ensym

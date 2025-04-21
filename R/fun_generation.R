@@ -3,12 +3,12 @@
     {
       .f = \(plot_list, figure, global) {
         # Setting up the environnement for plot generation
-        SCLC.BM.project::try_or_error(
+        makeFIgures.BM.project::try_or_error(
           {
             purrr::walk(figure[["library"]], base::library, character.only = TRUE)
 
             exec_env = rlang::new_environment(parent = rlang::global_env())
-            SCLC.BM.project::set_shims(exec_env)
+            makeFIgures.BM.project::set_shims(exec_env)
             purrr::walk(figure[["data"]], load, envir = exec_env)
             purrr::iwalk(plot_list, \(p, nm)rlang::env_poke(exec_env, nm, p))
           },
@@ -16,7 +16,7 @@
         )
 
         # Call the plot script
-        SCLC.BM.project::try_or_error(
+        makeFIgures.BM.project::try_or_error(
           {
             source(figure[["script"]], local = exec_env)
           },
@@ -24,7 +24,7 @@
         )
 
         # Ensure the result is sound (the plot variable should be in `p`)
-        SCLC.BM.project::try_or_error(
+        makeFIgures.BM.project::try_or_error(
           {
             if (!rlang::env_has(env = exec_env, nms = "p")) {
               rlang::abort("No object named {.var {p}}")
@@ -76,7 +76,7 @@
 .generate_plot = function(plot, fig, global) {
   .f = \(script, libraries, data, params) {
     # Setting up the environnement for plot generation
-    SCLC.BM.project::try_or_error(
+    makeFIgures.BM.project::try_or_error(
       {
         purrr::walk(libraries, base::library, character.only = TRUE)
 
@@ -84,14 +84,14 @@
           list(params = params),
           parent = rlang::global_env()
         )
-        SCLC.BM.project::set_shims(exec_env)
+        makeFIgures.BM.project::set_shims(exec_env)
         purrr::walk(data, load, envir = exec_env)
       },
       "Error while setting up execution environnement for plot {.field {plot}}!"
     )
 
     # Call the plot script
-    SCLC.BM.project::try_or_error(
+    makeFIgures.BM.project::try_or_error(
       {
         source(script, local = exec_env)
       },
@@ -99,7 +99,7 @@
     )
 
     # Ensure the result is sound (the plot variable should be in `p`)
-    SCLC.BM.project::try_or_error(
+    makeFIgures.BM.project::try_or_error(
       {
         if (!rlang::env_has(env = exec_env, nms = "p")) {
           rlang::abort("No object named {.var {p}}")
