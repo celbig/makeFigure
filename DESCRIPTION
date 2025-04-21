@@ -1,0 +1,11 @@
+Package: makeFigures
+Title: Ensure Reproduceability of figure generation
+Version: 0.0.1
+Authors@R: 
+    person("Célestin", "Bigarré", , "pro@cbigarre.me", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0002-7495-6502"))
+Description: Generate complete figures from a config file using pregenerated results. Plots script are guarantied to be run in a fresh R session with the required environment setup and can be parametrized and reused.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.1
