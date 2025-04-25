@@ -1,60 +1,59 @@
 .generate_figure = function(figure, global, theme) {
+
   try_or_error(
     {
-      .f = \(plot_list, figure, global) {
-        # Setting up the environnement for plot generation
-        makeFIgures.BM.project::try_or_error(
-          {
-            purrr::walk(figure[["library"]], base::library, character.only = TRUE)
-
-            exec_env = rlang::new_environment(parent = rlang::global_env())
-            makeFIgures.BM.project::set_shims(exec_env)
-            purrr::walk(figure[["data"]], load, envir = exec_env)
-            purrr::iwalk(plot_list, \(p, nm)rlang::env_poke(exec_env, nm, p))
-          },
-          "Error while setting up execution environnement for Figure {.field {figure$name}}!"
-        )
-
-        # Call the plot script
-        makeFIgures.BM.project::try_or_error(
-          {
-            source(figure[["script"]], local = exec_env)
-          },
-          "Error in execution of plot figure script {.file {figure$script}}!"
-        )
-
-        # Ensure the result is sound (the plot variable should be in `p`)
-        makeFIgures.BM.project::try_or_error(
-          {
-            if (!rlang::env_has(env = exec_env, nms = "p")) {
-              rlang::abort("No object named {.var {p}}")
-            }
-
-            plot_object = rlang::env_get(exec_env, nm = "p")
-            if (!patchwork:::is_valid_plot(plot_object)) {
-              rlang::abort(c(
-                "The variable {.var {p}} is not a correct plot object",
-                "{.var {p}} must be either a ggplot or grob object..."
-              ))
-            }
-          },
-          "Invalid plot object after execution of plot plot script {.file {script}}"
-        )
-
-        return(plot_object)
-      }
-
-      plot_list = map(
-        figure[["plots"]],
-        .generate_plot,
-        fig = figure,
-        global = global
-      )
-      names(plot_list) = figure[["plots"]]
-
+      exec_env = env()
       try_or_error(
         {
-          plot_object = r(.f, args = list(plot_list, figure, global), stdout = "log")
+          plot_object = .with_exec_environment(
+            {
+              plot_list = map(
+                figure[["plots"]],
+                .generate_plot
+              )
+              names(plot_list) = map(figure[["plots"]], "name")
+              attach(plot_list, name = ".plot_list")
+
+              # Call the figure script
+              env = rlang::current_env()
+              try_or_error(
+                {
+                  sys.source(
+                    .script,
+                    envir = env,
+                    keep.source = FALSE,
+                    keep.parse.data = FALSE
+                  )
+                },
+                "Error in execution of plot figure script {.file {(.script)}}!"
+              )
+              detach(name = ".plot_list", character.only = TRUE)
+
+              # Ensure the result is sound (the plot variable should be in `p`)
+              try_or_error(
+                {
+                  if (!rlang::env_has(env = env, nms = "p")) {
+                    rlang::abort("No object named {.var {p}}")
+                  }
+
+                  plot_object = rlang::env_get(env, nm = "p")
+                  if (!patchwork:::is_valid_plot(plot_object)) {
+                    rlang::abort(c(
+                      "The variable {.var {p}} is not a correct plot object",
+                      "{.var {p}} must be either a ggplot or grob object..."
+                    ))
+                  }
+                },
+                "Invalid plot object after execution of plot plot script {.file {(.script)}}"
+              )
+
+              plot_object
+            },
+            packages = figure$library,
+            data = figure$data,
+            objects = list(.params = figure$params, .script = figure$script),
+            env = exec_env
+          )
         },
         "Error while running figure script {.field {figure$script}}"
       )
@@ -65,82 +64,72 @@
         },
         "Error while applying theme!"
       )
-
-      return(plot_object)
     },
-    "Error while generating plot for figure {figure$name}"
+    "Error while generating figure {figure$name}"
   )
+
+  return(plot_object)
 }
 
-
-.generate_plot = function(plot, fig, global) {
-  .f = \(script, libraries, data, params) {
-    # Setting up the environnement for plot generation
-    makeFIgures.BM.project::try_or_error(
-      {
-        purrr::walk(libraries, base::library, character.only = TRUE)
-
-        exec_env = rlang::new_environment(
-          list(params = params),
-          parent = rlang::global_env()
-        )
-        makeFIgures.BM.project::set_shims(exec_env)
-        purrr::walk(data, load, envir = exec_env)
-      },
-      "Error while setting up execution environnement for plot {.field {plot}}!"
-    )
-
-    # Call the plot script
-    makeFIgures.BM.project::try_or_error(
-      {
-        source(script, local = exec_env)
-      },
-      "Error in execution of plot script {.file {script}}!"
-    )
-
-    # Ensure the result is sound (the plot variable should be in `p`)
-    makeFIgures.BM.project::try_or_error(
-      {
-        if (!rlang::env_has(env = exec_env, nms = "p")) {
-          rlang::abort("No object named {.var {p}}")
-        }
-
-        plot_object = rlang::env_get(exec_env, nm = "p")
-        if (!patchwork:::is_valid_plot(plot_object)) {
-          rlang::abort(c(
-            "The variable {.var {p}} is not a correct plot object",
-            "{.var {p}} must be either a ggplot or grob object..."
-          ))
-        }
-      },
-      "Invalid plot object after execution of plot plot script {.file {script}}"
-    )
-
-    return(plot_object)
-  }
-
-  ## call anonymous function with callr
-  plot_script = file.path(global$individual_plot_dir, paste0(plot, ".R"))
+#' @importFrom rlang current_env
+#' @importFrom rlang env_has
+#' @importFrom rlang env_get
+#' @importFrom rlang abort
+.generate_plot = function(plot) {
+  exec_env = env()
   try_or_error(
     {
-      plot_object = r(
-        .f,
-        args = list(
-          script = plot_script,
-          libraries = fig$library,
-          params = fig$params,
-          data = fig$data
-        ), 
+      plot_object = .with_exec_environment(
+        {
+          # Call the plot script
+          env = rlang::current_env()
+          cli::cli_inform("Processing plot {.field {plot$name}}", class = "immediateCondition")
+          try_or_error(
+            {
+              sys.source(
+                .script,
+                envir = env,
+                keep.source = FALSE,
+                keep.parse.data = FALSE
+              )
+            },
+            "Error in execution of plot script {.file {(.script)}}!"
+          )
+
+          # Ensure the result is sound (the plot variable should be in `p`)
+          try_or_error(
+            {
+              if (!env_has(env = env, nms = "p")) {
+                abort("No object named {.var {p}}")
+              }
+
+              plot_object = env_get(env, nm = "p")
+              if (!patchwork:::is_valid_plot(plot_object)) {
+                abort(c(
+                  "The variable {.var {p}} is not a correct plot object",
+                  "{.var {p}} must be either a ggplot or grob object..."
+                ))
+              }
+            },
+            "Invalid plot object after execution of plot plot script {.file {script}}"
+          )
+
+          plot_object
+        },
+        packages = plot$library,
+        data = plot$data,
+        objects = list(.script = plot$script, .params = plot$params),
+        env = exec_env
       )
     },
-    "Error while running plot script {.field {plot_script}}"
+    "Error while running plot script {.field {plot$script}}"
   )
 
   if (
     inherits(plot_object$theme, "theme") && isTRUE(plot_object$theme$complete)
   ) {
     cli_warn(c(
-      "!" = "The plot {.field {plot}} uses a complete theme",
+      "!" = "The plot {.field {plot$name}} uses a complete theme",
       i = "A global theme will be applied instead"
     ))
   }

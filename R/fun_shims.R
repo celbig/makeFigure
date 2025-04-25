@@ -20,7 +20,7 @@ set_shims = function(env){
 
 .shim_factory = function(name) {
   function(...) {
-    abort(glue("The function {{.fn {name}}} should not be used in this context!"))
+    abort(glue("The function {.fn {name}} should not be used in this context!"))
   }
 }
 

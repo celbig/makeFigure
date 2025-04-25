@@ -9,7 +9,10 @@
 #' @details Generate figures and save them as image on disk
 #'
 #' @export
-#' @importFrom furrr furrr_options
+#' @importFrom doFuture %dofuture%
+#' @importFrom foreach foreach
+#' @importFrom rlang cnd_muffle
+#' @importFrom cli cat_line
 make_figure = function(
   config_file,
   figure = NULL,
@@ -32,21 +35,39 @@ make_figure = function(
   )
 
   if (is.null(figure)) {
-    cli_inform("Processing all available figures...")
+    cli_inform(
+      "Processing all available figures...",
+      class = "immediateCondition"
+    )
+    old = options(
+      cli.num_colors = cli:::num_ansi_colors(),
+      cli.message_class = "immediateCondition"
+    )
+    on.exit(options(old), add = TRUE)
 
-    progress_bar = progressor(length(figures))
-    future_imap(figures, \(figure_config, figure_name) {
-      progress_bar(
-        glue("Generating figure {figure_name}"),
-        class = "sticky",
-        amount = 0
-      )
+    progressr::with_progress(
+      {
+        progress_bar = progressor(length(figures))
+        progress_bar(amount = 0)
 
-      plot = .generate_figure(figure_config, global, theme)
-      .save_figures(plot, figure_config, global)
+        for (i in seq_along(figures)) {
+          figure_config = figures[[i]]
+          figure_name = figure$name
+          progress_bar(
+            message = glue("Generating figure {figure_name}"),
+            class = "sticky",
+            amount = 0
+          )
 
-      progress_bar()
-    }, .options = furrr_options(seed = NULL))
+          plot = .generate_figure(figure_config, global, theme)
+          .save_figures(plot, figure_config, global)
+
+          progress_bar()
+        }
+      },
+      delay_terminal = FALSE,
+      delay_stdout = FALSE
+    )
 
     cli_inform("All the figures have been generated!")
   } else if (figure %in% names(figures)) {
